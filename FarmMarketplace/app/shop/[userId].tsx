@@ -1,4 +1,5 @@
-// // app/shop/[userId].tsx
+
+
 // import React, { useEffect, useState } from 'react';
 // import {
 //   View,
@@ -11,6 +12,7 @@
 //   FlatList,
 //   Dimensions,
 //   StatusBar,
+//   Alert
 // } from 'react-native';
 // import { useLocalSearchParams, useRouter } from 'expo-router';
 // import { supabase } from '../../supabase';
@@ -92,7 +94,15 @@
 //   const handleContactSeller = () => {
 //     if (seller?.phone) {
 //       // In a real app, you'd implement calling/messaging
-//       console.log('Contact seller:', seller.phone);
+//       Alert.alert(
+//         'Contact Seller',
+//         `Phone: ${seller.phone}`,
+//         [
+//           { text: 'Cancel', style: 'cancel' },
+//           { text: 'Call', onPress: () => console.log('Call:', seller.phone) },
+//           { text: 'Message', onPress: () => console.log('Message:', seller.phone) }
+//         ]
+//       );
 //     }
 //   };
 
@@ -434,6 +444,7 @@
 //   },
 // });
 
+
 // app/shop/[userId].tsx
 import React, { useEffect, useState } from 'react';
 import {
@@ -447,7 +458,7 @@ import {
   FlatList,
   Dimensions,
   StatusBar,
-  Alert
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../supabase';
@@ -513,6 +524,7 @@ export default function SellerShopScreen() {
       setListings(listingsData || []);
     } catch (error: any) {
       console.error('Error fetching shop:', error);
+      Alert.alert('Error', 'Failed to load shop');
     } finally {
       setLoading(false);
     }
@@ -528,7 +540,6 @@ export default function SellerShopScreen() {
 
   const handleContactSeller = () => {
     if (seller?.phone) {
-      // In a real app, you'd implement calling/messaging
       Alert.alert(
         'Contact Seller',
         `Phone: ${seller.phone}`,
@@ -538,6 +549,8 @@ export default function SellerShopScreen() {
           { text: 'Message', onPress: () => console.log('Message:', seller.phone) }
         ]
       );
+    } else {
+      Alert.alert('Info', 'Contact information not available');
     }
   };
 
@@ -618,9 +631,16 @@ export default function SellerShopScreen() {
         <View style={styles.sellerSection}>
           <View style={styles.sellerHeader}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {seller.name?.charAt(0)?.toUpperCase() || 'S'}
-              </Text>
+              {seller.profile_photo ? (
+                <Image 
+                  source={{ uri: seller.profile_photo }} 
+                  style={styles.profilePicture}
+                />
+              ) : (
+                <Text style={styles.avatarText}>
+                  {seller.name?.charAt(0)?.toUpperCase() || 'S'}
+                </Text>
+              )}
             </View>
             <View style={styles.sellerInfo}>
               <Text style={styles.sellerName}>{seller.name}</Text>
@@ -745,6 +765,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+    overflow: 'hidden',
+  },
+  profilePicture: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 40,
   },
   avatarText: {
     color: 'white',
@@ -777,6 +803,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 16,
     borderRadius: 12,
+    shadowColor: 'green',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   contactButtonText: {
     color: 'white',
@@ -871,6 +902,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
+    shadowColor: 'green',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   buttonText: {
     color: 'white',
