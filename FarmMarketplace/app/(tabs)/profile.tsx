@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +13,7 @@ import {
   Image,
   FlatList,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -50,6 +52,7 @@ export default function ProfileScreen() {
   const [uploading, setUploading] = useState<boolean>(false);
   const [editing, setEditing] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'shop'>('profile');
+  const [refreshing, setRefreshing] = useState<boolean>(false);
   const [form, setForm] = useState({
     name: '',
     phone: '',
@@ -60,28 +63,40 @@ export default function ProfileScreen() {
     checkAuth();
   }, []);
 
+  // Enhanced focus effect to refresh data whenever the screen comes into focus
   useFocusEffect(
-    React.useCallback(() => {
-      if (user) {
-        fetchProfile(user.id);
-        if (activeTab === 'shop') {
-          fetchMyListings(user.id);
-        }
-      }
-    }, [user, activeTab])
+    useCallback(() => {
+      console.log('Profile screen focused - refreshing data...');
+      refreshAllData();
+    }, [])
   );
 
   const checkAuth = async (): Promise<void> => {
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
       setUser(session.user);
-      fetchProfile(session.user.id);
-      if (activeTab === 'shop') {
-        fetchMyListings(session.user.id);
-      }
+      await refreshAllData();
     } else {
       router.replace('/(auth)/login');
     }
+  };
+
+  const refreshAllData = async (): Promise<void> => {
+    if (!user) {
+      // Get current user if not available
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        await fetchProfile(session.user.id);
+        await fetchMyListings(session.user.id);
+      }
+      return;
+    }
+    
+    await Promise.all([
+      fetchProfile(user.id),
+      fetchMyListings(user.id)
+    ]);
   };
 
   const fetchProfile = async (userId: string): Promise<void> => {
@@ -122,6 +137,18 @@ export default function ProfileScreen() {
       setLoading(false);
     }
   };
+
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshAllData();
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [user]);
 
   const requestPermissions = async (): Promise<void> => {
     const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
@@ -196,7 +223,7 @@ export default function ProfileScreen() {
       if (error) throw error;
 
       Alert.alert('Success', 'Profile picture updated!');
-      fetchProfile(user!.id);
+      await fetchProfile(user!.id); // Refresh profile data
     } catch (error: any) {
       console.error('Error updating profile picture:', error);
       Alert.alert('Error', error.message);
@@ -225,7 +252,7 @@ export default function ProfileScreen() {
 
       Alert.alert('Success', 'Profile updated successfully');
       setEditing(false);
-      await fetchProfile(user!.id);
+      await fetchProfile(user!.id); // Refresh profile data
     } catch (error: any) {
       console.error('Error updating profile:', error);
       Alert.alert('Error', error.message);
@@ -253,8 +280,9 @@ export default function ProfileScreen() {
               if (error) throw error;
 
               Alert.alert('Success', 'Listing deleted successfully');
+              // Refresh listings after deletion
               if (user) {
-                fetchMyListings(user.id);
+                await fetchMyListings(user.id);
               }
             } catch (error: any) {
               console.error('Error deleting listing:', error);
@@ -284,6 +312,12 @@ export default function ProfileScreen() {
 
   const handleTabChange = (tab: 'profile' | 'shop') => {
     setActiveTab(tab);
+    // Refresh data when switching tabs
+    if (user) {
+      if (tab === 'shop') {
+        fetchMyListings(user.id);
+      }
+    }
   };
 
   const renderProfilePictureSection = () => (
@@ -412,7 +446,18 @@ export default function ProfileScreen() {
       </View>
 
       {activeTab === 'profile' ? (
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.content} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['green']}
+              tintColor={'green'}
+            />
+          }
+        >
           {/* Profile Picture Section */}
           {renderProfilePictureSection()}
 
@@ -530,6 +575,14 @@ export default function ProfileScreen() {
               keyExtractor={(item) => item.id}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.listingsContainer}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  colors={['green']}
+                  tintColor={'green'}
+                />
+              }
             />
           )}
         </View>
@@ -538,6 +591,7 @@ export default function ProfileScreen() {
   );
 }
 
+// ... keep all your existing styles exactly the same ...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
